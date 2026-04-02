@@ -70,7 +70,9 @@ export function LogView({
   return (
     <Box
       flexDirection="column"
-      {...(framed ? { borderStyle: "round" as const, borderColor, paddingX: 1 } : {})}
+      {...(framed
+        ? { borderStyle: "round" as const, borderColor, paddingX: 1 }
+        : {})}
       {...(unboundedHeight ? {} : { flexGrow: 1 })}
     >
       {title ? <Text color={borderColor}>{title}</Text> : null}
