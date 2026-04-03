@@ -264,3 +264,22 @@ git push --tags
 ### GitHub Secrets Required
 
 - `NPM_TOKEN`: npm automation token with publish access to `@kwiruu/taki-cli`
+- `RELEASE_PLEASE_TOKEN` (optional fallback): GitHub PAT for creating release PRs when Actions cannot use `GITHUB_TOKEN` to open pull requests.
+
+### GitHub Actions Settings Required
+
+In repository settings:
+
+1. Settings -> Actions -> General
+2. Workflow permissions: **Read and write permissions**
+3. Enable: **Allow GitHub Actions to create and approve pull requests**
+
+If your organization blocks this setting, create a fine-grained PAT and save it as `RELEASE_PLEASE_TOKEN`.
+
+### How To Create NPM_TOKEN
+
+1. Open npmjs.com and sign in with the account that can publish `@kwiruu/taki-cli`.
+2. Go to Account Settings -> Access Tokens.
+3. Create a new token for CI publishing (automation or granular publish token).
+4. Copy the token once, then add it in GitHub: Settings -> Secrets and variables -> Actions -> New repository secret.
+5. Secret name: `NPM_TOKEN`.

@@ -50,7 +50,10 @@ describe("runAddService", () => {
 
     expect(next.maxLogLines).toBe(321);
     expect(next.ui?.theme).toBe("vscode-dark-plus");
-    expect(next.services.map((service) => service.name)).toEqual(["api", "web"]);
+    expect(next.services.map((service) => service.name)).toEqual([
+      "api",
+      "web",
+    ]);
     expect(next.services[1]?.color).toBe("cyan");
   });
 

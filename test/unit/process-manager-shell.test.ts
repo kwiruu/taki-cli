@@ -7,7 +7,9 @@ describe("shouldUseShellForCommand", () => {
   });
 
   it("returns false on non-Windows when args are provided", () => {
-    const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+    const platformSpy = vi
+      .spyOn(process, "platform", "get")
+      .mockReturnValue("linux");
 
     expect(shouldUseShellForCommand("npm", true)).toBe(false);
 
@@ -15,7 +17,9 @@ describe("shouldUseShellForCommand", () => {
   });
 
   it("returns true for Windows command shims when args are provided", () => {
-    const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const platformSpy = vi
+      .spyOn(process, "platform", "get")
+      .mockReturnValue("win32");
 
     expect(shouldUseShellForCommand("npm", true)).toBe(true);
     expect(shouldUseShellForCommand("yarn", true)).toBe(true);
@@ -24,7 +28,9 @@ describe("shouldUseShellForCommand", () => {
   });
 
   it("returns true for .cmd and .bat on Windows", () => {
-    const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const platformSpy = vi
+      .spyOn(process, "platform", "get")
+      .mockReturnValue("win32");
 
     expect(shouldUseShellForCommand("tool.cmd", true)).toBe(true);
     expect(shouldUseShellForCommand("tool.bat", true)).toBe(true);
@@ -33,7 +39,9 @@ describe("shouldUseShellForCommand", () => {
   });
 
   it("returns false for non-shim executables on Windows", () => {
-    const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("win32");
+    const platformSpy = vi
+      .spyOn(process, "platform", "get")
+      .mockReturnValue("win32");
 
     expect(shouldUseShellForCommand("node", true)).toBe(false);
 
