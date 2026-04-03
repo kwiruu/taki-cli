@@ -1,6 +1,9 @@
 name: Publish
 
 on:
+  release:
+    types:
+      - published
   workflow_dispatch:
 
 permissions:
@@ -10,6 +13,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false }}
 
     steps:
       - name: Checkout
@@ -37,7 +41,21 @@ jobs:
             exit 1
           fi
 
+      - name: Check if version already exists on npm
+        id: npm-check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          if npm view "@kwiruu/taki-cli@$VERSION" version >/dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "Version $VERSION is already published. Skipping publish step."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish package
+        if: ${{ steps.npm-check.outputs.already_published != 'true' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public
