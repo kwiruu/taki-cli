@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/kwiruu/taki-cli/compare/taki-cli-v0.2.0...taki-cli-v0.3.0) (2026-04-03)
+
+
+### Features
+
+* added npm publish on workflox ([a273b0d](https://github.com/kwiruu/taki-cli/commit/a273b0d44e82da1d73ec113a5c5caa5213d9857e))
+
+
+### Bug Fixes
+
+* **ci:** skip release-please labeling to prevent API failure ([5eba38b](https://github.com/kwiruu/taki-cli/commit/5eba38b0980ffaf626d8dea62aefa90bb0c4a913))
+
 ## [0.2.0](https://github.com/kwiruu/taki-cli/compare/taki-cli-v0.1.0...taki-cli-v0.2.0) (2026-04-03)
 
 
