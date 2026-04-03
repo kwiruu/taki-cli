@@ -1,6 +1,6 @@
 {
   "name": "@kwiruu/taki-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A terminal multiplexer CLI for local development workflows.",
   "type": "module",
   "main": "dist/bin/cli.js",
