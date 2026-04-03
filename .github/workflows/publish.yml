@@ -17,7 +17,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.release.prerelease == false) || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'v') || startsWith(github.event.head_commit.message, 'chore(main): release '))) }}
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && github.event.release.prerelease == false) || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'v') || startsWith(github.event.head_commit.message, 'chore(main): release '))) }}"
     outputs:
       version: ${{ steps.version.outputs.version }}
 
