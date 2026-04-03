@@ -577,7 +577,7 @@ function delay(ms: number): Promise<void> {
   });
 }
 
-function shouldUseShellForCommand(
+export function shouldUseShellForCommand(
   command: string,
   usingArgs: boolean,
 ): boolean {

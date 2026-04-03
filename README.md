@@ -249,8 +249,18 @@ Example:
 ## Publish
 
 ```bash
+npm run release:check
 npm version patch
-npm test
-npm run pack:check
-npm publish --access public
+git push
+git push --tags
 ```
+
+## Release Automation
+
+- CI runs on push/PR across Node LTS matrix and executes `npm run release:check`.
+- Release Please creates release PRs from merged commits on `main`.
+- Pushing a version tag like `v0.1.1` triggers automated npm publish.
+
+### GitHub Secrets Required
+
+- `NPM_TOKEN`: npm automation token with publish access to `@kwiruu/taki-cli`

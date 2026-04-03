@@ -706,9 +706,9 @@ export function App({
         ? "Full log: Esc return to dashboard."
         : viewMode === "shortcuts"
           ? "Shortcuts: Esc or ? to return to dashboard."
-        : activePaneCountSafe > 1
-          ? "Controls: arrow keys or h/j/k/l focus panes, Tab next pane, 1/2/3/4 switch layouts, r restart focused service, ? shortcuts, o options, q or Ctrl+C quit."
-          : "Controls: up/down or j/k select service, 1/2/3/4 switch layouts, r restart selected, ? shortcuts, o options, q or Ctrl+C quit.";
+          : activePaneCountSafe > 1
+            ? "Controls: arrow keys or h/j/k/l focus panes, Tab next pane, 1/2/3/4 switch layouts, r restart focused service, ? shortcuts, o options, q or Ctrl+C quit."
+            : "Controls: up/down or j/k select service, 1/2/3/4 switch layouts, r restart selected, ? shortcuts, o options, q or Ctrl+C quit.";
 
   const optionsTitle =
     optionsMenu === "root"

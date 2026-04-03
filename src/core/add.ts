@@ -2,7 +2,11 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-import type { ServiceColor, ServiceConfig, TakiConfig } from "../types/index.js";
+import type {
+  ServiceColor,
+  ServiceConfig,
+  TakiConfig,
+} from "../types/index.js";
 import { loadConfig } from "./config.js";
 import { parseArgsInput, parseCsvList } from "./init.js";
 
@@ -207,7 +211,9 @@ function finalizeService(
   return service;
 }
 
-function normalizeServiceColor(value: string | undefined): ServiceColor | undefined {
+function normalizeServiceColor(
+  value: string | undefined,
+): ServiceColor | undefined {
   if (!value || !value.trim()) {
     return undefined;
   }

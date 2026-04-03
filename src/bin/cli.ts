@@ -115,7 +115,7 @@ program
   .option("-c, --config <path>", "Path to the config file", "taki.json")
   .option("--name <name>", "Service name")
   .option("--command <command>", "Command executable")
-  .option("--args <args>", "Args as a quoted string, e.g. \"run dev\"")
+  .option("--args <args>", 'Args as a quoted string, e.g. "run dev"')
   .option("--color <color>", "Service color")
   .option("--cwd <path>", "Service working directory")
   .option(
