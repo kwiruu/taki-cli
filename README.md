@@ -19,6 +19,8 @@
   </tr>
 </table>
 
+Docs website: https://taki-web.pages.dev/
+
 ## Showcase
 
 ![Watch Taki CLI demo](./assets/readme/demo.gif)
@@ -281,12 +283,14 @@ git push --tags
 - Release Please creates release PRs from merged commits on `main`.
 - If a release PR is already open, new commits pushed to `main` update that same PR (version + changelog) automatically.
 - After a release PR is merged, `Release Please` creates the tag/release, and the `Publish` workflow auto-runs on that published GitHub release.
-- `Publish` workflow also supports manual fallback (`workflow_dispatch`) for recovery/retries.
+- `Publish` workflow publishes to both npmjs and GitHub Packages, and also supports manual fallback (`workflow_dispatch`) for recovery/retries.
 
 ### GitHub Secrets Required
 
 - `NPM_TOKEN`: npm automation token with publish access to `@kwiruu/taki-cli`
 - `RELEASE_PLEASE_TOKEN` (recommended): GitHub PAT used by Release Please. Using a PAT helps downstream automation (such as release/tag side effects) run reliably.
+
+`GITHUB_TOKEN` is used automatically for GitHub Packages publishing from Actions (no extra secret needed).
 
 ### GitHub Actions Settings Required
 
