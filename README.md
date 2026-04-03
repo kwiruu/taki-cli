@@ -280,13 +280,13 @@ git push --tags
 - CI runs on push/PR across Node LTS matrix and executes `npm run release:check`.
 - Release Please creates release PRs from merged commits on `main`.
 - If a release PR is already open, new commits pushed to `main` update that same PR (version + changelog) automatically.
-- Version tags and npm publish only happen after the release PR is merged.
-- Pushing a version tag like `v0.1.1` triggers automated npm publish.
+- After a release PR is merged, the `Release Please` workflow creates the tag/release and then publishes to npm automatically.
+- `Publish` workflow is kept as a manual fallback (`workflow_dispatch`) for recovery/retries.
 
 ### GitHub Secrets Required
 
 - `NPM_TOKEN`: npm automation token with publish access to `@kwiruu/taki-cli`
-- `RELEASE_PLEASE_TOKEN` (optional fallback): GitHub PAT for creating release PRs when Actions cannot use `GITHUB_TOKEN` to open pull requests.
+- `RELEASE_PLEASE_TOKEN` (recommended): GitHub PAT used by Release Please. Using a PAT helps downstream automation (such as release/tag side effects) run reliably.
 
 ### GitHub Actions Settings Required
 
