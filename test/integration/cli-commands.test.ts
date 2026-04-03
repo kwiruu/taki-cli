@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const createdDirs: string[] = [];
+const CLI_TEST_TIMEOUT_MS = process.platform === "win32" ? 20000 : 10000;
 
 afterEach(async () => {
   await Promise.all(
@@ -28,7 +29,7 @@ describe("CLI command behavior", () => {
     const resultFlag = await runCli(["--version"]);
     expect(resultFlag.exitCode).toBe(0);
     expect(resultFlag.stdout).toMatch(/^\d+\.\d+\.\d+/m);
-  });
+  }, CLI_TEST_TIMEOUT_MS);
 
   it("uses subcommand --config for config output", async () => {
     const tempDir = await mkdtemp(path.join(tmpdir(), "taki-cli-commands-"));
@@ -47,7 +48,7 @@ describe("CLI command behavior", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('"name": "target"');
-  });
+  }, CLI_TEST_TIMEOUT_MS);
 
   it("uses subcommand --config for add and does not mutate cwd config", async () => {
     const tempDir = await mkdtemp(path.join(tmpdir(), "taki-cli-add-"));
@@ -105,7 +106,7 @@ describe("CLI command behavior", () => {
       "web",
     ]);
     expect(cwd.services.map((service) => service.name)).toEqual(["cwd"]);
-  });
+  }, CLI_TEST_TIMEOUT_MS);
 });
 
 type CliResult = {
