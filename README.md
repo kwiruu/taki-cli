@@ -1,13 +1,33 @@
-# Taki CLI
+<table>
+  <tr>
+    <td width="180" valign="top">
+      </br>
+      </br>
+      <img src="./assets/readme/logo_white.svg" alt="Taki CLI logo" width="140" />
+    </td>
+    <td valign="top">
+      <h1>Taki CLI</h1>
+      <p>Taki is a terminal dashboard for running multiple local services in one place.</p>
+      <p>It helps you:</p>
+      <ul>
+        <li>start and monitor many services from one command</li>
+        <li>see logs in a single UI</li>
+        <li>restart a focused service quickly</li>
+        <li>scaffold <code>taki.json</code> with an interactive wizard</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
-Taki is a terminal dashboard for running multiple local services in one place.
+## Showcase
 
-It helps you:
+![Watch Taki CLI demo](./assets/readme/demo.gif)
 
-- start and monitor many services from one command
-- see logs in a single UI
-- restart a focused service quickly
-- scaffold `taki.json` with an interactive wizard
+### Sample Images
+
+| `taki init` sample                                          | `taki run` sample                                            |
+| ----------------------------------------------------------- | ------------------------------------------------------------ |
+| ![Taki init wizard sample](./assets/readme/init-sample.png) | ![Taki run dashboard sample](./assets/readme/run-sample.png) |
 
 ## Install
 
@@ -259,6 +279,8 @@ git push --tags
 
 - CI runs on push/PR across Node LTS matrix and executes `npm run release:check`.
 - Release Please creates release PRs from merged commits on `main`.
+- If a release PR is already open, new commits pushed to `main` update that same PR (version + changelog) automatically.
+- Version tags and npm publish only happen after the release PR is merged.
 - Pushing a version tag like `v0.1.1` triggers automated npm publish.
 
 ### GitHub Secrets Required
