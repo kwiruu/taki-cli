@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/kwiruu/taki-cli/compare/taki-cli-v0.7.0...taki-cli-v0.7.1) (2026-04-03)
+
+
+### Bug Fixes
+
+* missing logo on npm package page ([acbe75c](https://github.com/kwiruu/taki-cli/commit/acbe75c1a4b147d2ee97cc4692dfa9a3d42f42f3))
+
 ## [0.7.0](https://github.com/kwiruu/taki-cli/compare/taki-cli-v0.6.0...taki-cli-v0.7.0) (2026-04-03)
 
 
