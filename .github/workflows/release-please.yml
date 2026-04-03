@@ -25,3 +25,33 @@ jobs:
           skip-labeling: true
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  finalize-release:
+    runs-on: ubuntu-latest
+    needs: release-please
+    if: ${{ github.event_name == 'push' && startsWith(github.event.head_commit.message, 'v') }}
+    steps:
+      - name: Prepare release metadata
+        id: meta
+        env:
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          VERSION="${HEAD_COMMIT_MESSAGE#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=taki-cli-v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release if missing
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+          else
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "v$VERSION" \
+              --generate-notes
+          fi

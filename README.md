@@ -282,7 +282,8 @@ git push --tags
 - CI runs on push/PR across Node LTS matrix and executes `npm run release:check`.
 - Release Please creates release PRs from merged commits on `main`.
 - If a release PR is already open, new commits pushed to `main` update that same PR (version + changelog) automatically.
-- After a release PR is merged, `Release Please` creates the tag/release, and the `Publish` workflow auto-runs on that published GitHub release.
+- After a release PR is merged, `Release Please` finalizes the version commit and ensures a matching GitHub release/tag exists.
+- The `Publish` workflow runs on published GitHub releases, and also on `vX.Y.Z` commits pushed to `main` as a fallback.
 - `Publish` workflow publishes to both npmjs and GitHub Packages, and also supports manual fallback (`workflow_dispatch`) for recovery/retries.
 
 ### GitHub Secrets Required
