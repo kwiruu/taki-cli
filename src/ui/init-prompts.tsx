@@ -153,6 +153,7 @@ export async function askInkInputPrompt(
   defaultValue: string,
   contextLines: string[] = [],
   theme: InitThemeTokens = getThemePreset(DEFAULT_THEME_PRESET_ID).init,
+  fixedPrefix = "",
 ): Promise<InkPromptResult<string>> {
   return await new Promise<InkPromptResult<string>>((resolve) => {
     let done = false;
@@ -237,6 +238,7 @@ export async function askInkInputPrompt(
           cursorVisible,
           supportsReverseCursor(),
           theme,
+          fixedPrefix,
         )}`;
 
         return [
@@ -271,20 +273,27 @@ function renderInputField(
   cursorVisible: boolean,
   supportsReverse: boolean,
   theme: InitThemeTokens,
+  fixedPrefix = "",
 ): string {
   if (fieldWidth <= 0) {
     return "";
   }
 
+  const prefix = truncateText(fixedPrefix, fieldWidth);
+  const editableWidth = Math.max(1, fieldWidth - prefix.length);
+
+  const paintPrefix = (text: string): string =>
+    applyChalkColor(theme.accentColor, text);
+
   if (value.length > 0) {
-    const visibleTextWidth = Math.max(0, fieldWidth - 1);
+    const visibleTextWidth = Math.max(0, editableWidth - 1);
     const clippedValue =
       value.length > visibleTextWidth
         ? value.slice(value.length - visibleTextWidth)
         : value;
-    const baseField = clippedValue.padEnd(fieldWidth, " ");
-    const cursorIndex = Math.min(clippedValue.length, fieldWidth - 1);
-    return renderCursorOverlay(
+    const baseField = clippedValue.padEnd(editableWidth, " ");
+    const cursorIndex = Math.min(clippedValue.length, editableWidth - 1);
+    const editableSegment = renderCursorOverlay(
       baseField,
       cursorIndex,
       cursorVisible,
@@ -292,11 +301,13 @@ function renderInputField(
       (nextValue) => applyChalkColor(theme.contentColor, nextValue),
       theme.accentStrongColor,
     );
+
+    return `${paintPrefix(prefix)}${editableSegment}`;
   }
 
-  const placeholder = truncateText(defaultValue, fieldWidth);
-  const baseField = placeholder.padEnd(fieldWidth, " ");
-  return renderCursorOverlay(
+  const placeholder = truncateText(defaultValue, editableWidth);
+  const baseField = placeholder.padEnd(editableWidth, " ");
+  const editableSegment = renderCursorOverlay(
     baseField,
     0,
     cursorVisible,
@@ -304,6 +315,8 @@ function renderInputField(
     (nextValue) => applyChalkColor(theme.mutedColor, nextValue),
     theme.accentStrongColor,
   );
+
+  return `${paintPrefix(prefix)}${editableSegment}`;
 }
 
 function renderCursorOverlay(

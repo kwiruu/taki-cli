@@ -50,6 +50,12 @@ taki
 ```bash
 taki init
 taki run
+taki config --config ./taki.json
+taki add --name app --command npm --args "run dev"
+taki version
+taki v
+taki --version
+taki -v
 taki --config ./taki.json
 taki run --config ./taki.json
 ```
@@ -77,6 +83,14 @@ Flags:
 - `q` or `Ctrl+C`: quit and shutdown all services
 - `r`: restart focused service
 - `o`: open options
+- `?`: show shortcut commands panel
+
+### Layout shortcuts
+
+- `1`: single pane
+- `2`: vertical panes
+- `3`: horizontal panes
+- `4`: grid panes
 
 ### Single-pane mode
 
@@ -91,6 +105,11 @@ Flags:
 
 - Open via `o` -> Full log
 - `Esc`: return to dashboard
+
+### Shortcuts panel
+
+- Open with `?`
+- `Esc` or `?`: close panel
 
 ## Layout Options
 
@@ -111,6 +130,49 @@ Available presets include both VS Code-like and terminal themes, such as:
 - Terminal: Gruvbox Dark, Solarized Dark/Light, Nord, Dracula, One Dark
 
 Theme choice is saved into `taki.json` under `ui.theme`.
+
+## Config Command
+
+Print validated current config:
+
+```bash
+taki config
+taki config --config ./taki.json
+```
+
+## Add Service Command
+
+Add a service to your `taki.json` interactively:
+
+```bash
+taki add
+```
+
+Or use flags:
+
+```bash
+taki add --name app --command npm --args "run dev" --cwd ./kwenta-mo-app --color magenta
+```
+
+Useful flags:
+
+- `--config <path>`: choose config file path
+- `--name <name>`: service name
+- `--command <command>`: executable command
+- `--args "..."`: argument string
+- `--cwd <path>`: working directory
+- `--color <color>`: one of red, green, yellow, blue, magenta, cyan, white, gray
+- `--start-after <names>`: comma-separated dependencies
+- `--yes`: skip prompts, require essential flags
+
+## Version
+
+```bash
+taki version
+taki v
+taki --version
+taki -v
+```
 
 ## Config File (`taki.json`)
 

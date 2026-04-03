@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import React from "react";
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import { render } from "ink";
 import { loadConfig, setConfigThemePreference } from "../core/config.js";
+import { runAddService } from "../core/add.js";
 import { runInteractiveInit } from "../core/init.js";
 import { ProcessManager } from "../core/process-manager.js";
 import { installSignalHandlers } from "../core/shutdown-handler.js";
@@ -10,10 +12,29 @@ import { RingBuffer } from "../io/ring-buffer.js";
 import { App } from "../ui/app.js";
 import type { LogEntry } from "../types/index.js";
 
+const require = createRequire(import.meta.url);
+const packageJson = require("../../package.json") as { version?: string };
+const TAKI_CLI_VERSION = packageJson.version ?? "0.0.0";
+
 type RunOptions = {
   config: string;
   maxLogLines?: number;
   shutdownTimeout: number;
+};
+
+type ConfigOptions = {
+  config: string;
+};
+
+type AddOptions = {
+  config: string;
+  name?: string;
+  command?: string;
+  args?: string;
+  color?: string;
+  cwd?: string;
+  startAfter?: string;
+  yes?: boolean;
 };
 
 const parseNumberOption = (value: string): number => Number.parseInt(value, 10);
@@ -23,6 +44,8 @@ const program = new Command()
   .description(
     "Run multiple local services in one color-coded terminal dashboard.",
   )
+  .enablePositionalOptions()
+  .version(TAKI_CLI_VERSION, "-v, --version", "Show Taki CLI version")
   .option("-c, --config <path>", "Path to the config file", "taki.json")
   .option(
     "--max-log-lines <count>",
@@ -37,6 +60,22 @@ const program = new Command()
   )
   .action(async () => {
     await runDashboard(program.opts<RunOptions>());
+  });
+
+program
+  .command("version")
+  .alias("v")
+  .description("Show current taki version.")
+  .action(() => {
+    printVersion();
+  });
+
+program
+  .command("config")
+  .description("Print validated taki config JSON.")
+  .option("-c, --config <path>", "Path to the config file", "taki.json")
+  .action(async (options: ConfigOptions) => {
+    await printCurrentConfig(options);
   });
 
 program
@@ -67,6 +106,33 @@ program
     await runInteractiveInit({
       configPath: options.config,
       force: options.force,
+    });
+  });
+
+program
+  .command("add")
+  .description("Add a new service entry to taki config.")
+  .option("-c, --config <path>", "Path to the config file", "taki.json")
+  .option("--name <name>", "Service name")
+  .option("--command <command>", "Command executable")
+  .option("--args <args>", "Args as a quoted string, e.g. \"run dev\"")
+  .option("--color <color>", "Service color")
+  .option("--cwd <path>", "Service working directory")
+  .option(
+    "--start-after <names>",
+    "Comma-separated service names to start after",
+  )
+  .option("-y, --yes", "Skip interactive prompts and use only provided flags")
+  .action(async (options: AddOptions) => {
+    await runAddService({
+      configPath: options.config,
+      name: options.name,
+      command: options.command,
+      args: options.args,
+      color: options.color,
+      cwd: options.cwd,
+      startAfter: options.startAfter,
+      yes: options.yes,
     });
   });
 
@@ -149,4 +215,13 @@ async function runDashboard(options: RunOptions): Promise<void> {
       process.exit(signal === "SIGINT" ? 130 : 0);
     }
   }
+}
+
+async function printCurrentConfig(options: ConfigOptions): Promise<void> {
+  const config = await loadConfig(options.config);
+  console.log(JSON.stringify(config, null, 2));
+}
+
+function printVersion(): void {
+  console.log(`taki v${TAKI_CLI_VERSION}`);
 }

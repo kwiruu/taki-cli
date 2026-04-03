@@ -19,6 +19,74 @@ afterEach(async () => {
 });
 
 describe("CLI integration", () => {
+  it("does not exit when restarting a service with r", async () => {
+    const workspaceRoot = path.resolve(here, "..", "..");
+    const tempDir = await mkdtemp(path.join(tmpdir(), "taki-integration-"));
+    createdDirs.push(tempDir);
+
+    const parentPidFile = path.join(tempDir, "parent.pid");
+    const childPidFile = path.join(tempDir, "child.pid");
+    const configPath = path.join(tempDir, "taki.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        services: [
+          {
+            name: "tree",
+            command: process.execPath,
+            args: [
+              path.join(workspaceRoot, "test", "fixtures", "tree-parent.js"),
+            ],
+            color: "yellow",
+            env: {
+              TAKI_PARENT_PID_FILE: parentPidFile,
+              TAKI_CHILD_PID_FILE: childPidFile,
+            },
+            healthCheck: {
+              type: "log",
+              pattern: "PARENT_READY",
+              timeoutMs: 5000,
+            },
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const tsxCli = path.join(
+      workspaceRoot,
+      "node_modules",
+      "tsx",
+      "dist",
+      "cli.mjs",
+    );
+    const takiCli = path.join(workspaceRoot, "src", "bin", "cli.ts");
+
+    const cli = spawn(
+      process.execPath,
+      [tsxCli, takiCli, "--config", configPath],
+      {
+        cwd: workspaceRoot,
+        stdio: "pipe",
+        env: process.env,
+      },
+    );
+
+    await waitForFile(parentPidFile, 8000);
+    cli.stdin.write("r");
+
+    const exitedEarly = await Promise.race([
+      once(cli, "exit").then(() => true),
+      delay(1600).then(() => false),
+    ]);
+
+    expect(exitedEarly).toBe(false);
+
+    cli.kill("SIGINT");
+    await once(cli, "exit");
+  }, 25000);
+
   it("stops service trees on Ctrl+C", async () => {
     const workspaceRoot = path.resolve(here, "..", "..");
     const tempDir = await mkdtemp(path.join(tmpdir(), "taki-integration-"));

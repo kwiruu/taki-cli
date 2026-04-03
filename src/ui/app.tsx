@@ -26,7 +26,7 @@ interface Dimensions {
   rows: number;
 }
 
-type ViewMode = "normal" | "options" | "full-log";
+type ViewMode = "normal" | "options" | "full-log" | "shortcuts";
 type OptionsMenu = "root" | "layout" | "count" | "grid" | "theme";
 type LayoutMode = "single" | "vertical" | "horizontal" | "grid";
 
@@ -48,6 +48,28 @@ const LAYOUT_OPTIONS = [
   "Horizontal panes",
   "Grid panes",
   "Back",
+] as const;
+
+const SHORTCUTS_HELP_LINES = [
+  "Global:",
+  "  q / Ctrl+C  Quit",
+  "  o           Open options",
+  "  ?           Toggle shortcut help",
+  "  r           Restart focused service",
+  "",
+  "Layout quick switch:",
+  "  1 Single pane",
+  "  2 Vertical panes",
+  "  3 Horizontal panes",
+  "  4 Grid panes",
+  "",
+  "Navigation:",
+  "  Up/Down or j/k     Select service (single pane)",
+  "  Arrows or h/j/k/l  Move focus (multi-pane)",
+  "  Tab                Next pane",
+  "",
+  "Views:",
+  "  Esc  Close options/full-log/shortcuts view",
 ] as const;
 
 function getDimensions(stdout: NodeJS.WriteStream): Dimensions {
@@ -346,6 +368,14 @@ export function App({
       return;
     }
 
+    if (viewMode === "shortcuts") {
+      if (key.escape || input === "?") {
+        setViewMode("normal");
+      }
+
+      return;
+    }
+
     if (viewMode === "options") {
       if (key.escape) {
         if (optionsMenu !== "root") {
@@ -500,6 +530,31 @@ export function App({
       return;
     }
 
+    if (input === "?") {
+      setViewMode("shortcuts");
+      return;
+    }
+
+    if (input === "1") {
+      applyLayoutMode("single");
+      return;
+    }
+
+    if (input === "2") {
+      applyLayoutMode("vertical");
+      return;
+    }
+
+    if (input === "3") {
+      applyLayoutMode("horizontal");
+      return;
+    }
+
+    if (input === "4") {
+      applyLayoutMode("grid");
+      return;
+    }
+
     if (input === "o") {
       setViewMode("options");
       setOptionsMenu("root");
@@ -649,9 +704,11 @@ export function App({
         : "Options: up/down choose, Enter select, Esc back/close."
       : viewMode === "full-log"
         ? "Full log: Esc return to dashboard."
+        : viewMode === "shortcuts"
+          ? "Shortcuts: Esc or ? to return to dashboard."
         : activePaneCountSafe > 1
-          ? "Controls: arrow keys or h/j/k/l focus panes, Tab next pane, r restart focused service, o options, q or Ctrl+C quit."
-          : "Controls: up/down or j/k select service, r restart selected, o options, q or Ctrl+C quit.";
+          ? "Controls: arrow keys or h/j/k/l focus panes, Tab next pane, 1/2/3/4 switch layouts, r restart focused service, ? shortcuts, o options, q or Ctrl+C quit."
+          : "Controls: up/down or j/k select service, 1/2/3/4 switch layouts, r restart selected, ? shortcuts, o options, q or Ctrl+C quit.";
 
   const optionsTitle =
     optionsMenu === "root"
@@ -686,7 +743,22 @@ export function App({
   }, [activePaneCountSafe, geometry.columns, geometry.rows]);
 
   const logsSurface =
-    viewMode === "options" ? (
+    viewMode === "shortcuts" ? (
+      <Box
+        flexDirection="column"
+        borderStyle={activeTheme.run.borderStyle}
+        borderColor={activeTheme.run.optionsBorderColor}
+        paddingX={1}
+        flexGrow={1}
+      >
+        <Text color={activeTheme.run.optionsTitleColor}>Shortcuts</Text>
+        {SHORTCUTS_HELP_LINES.map((line, index) => (
+          <Text key={`shortcut-${index}`} color={activeTheme.run.footerColor}>
+            {line}
+          </Text>
+        ))}
+      </Box>
+    ) : viewMode === "options" ? (
       <Box
         flexDirection="column"
         borderStyle={activeTheme.run.borderStyle}

@@ -74,9 +74,21 @@ interface TerminalMetrics {
 
 type PreviewMode = "full" | "compact";
 
+const CUSTOM_COMMAND_VALUE = "__custom_command__";
+const COMMAND_EXECUTABLE_OPTIONS = [
+  "npm",
+  "npx",
+  "pnpm",
+  "yarn",
+  "bun",
+  "node",
+  "python",
+] as const;
+
 interface PromptUiOptions {
   contextLines?: string[];
   suppressEcho?: boolean;
+  lockedPrefix?: string;
 }
 
 function paintInit(color: ChalkColorToken, value: string): string {
@@ -383,21 +395,24 @@ async function askService(
     return BACK;
   }
 
-  const command = await askWithDefault(
-    rl,
-    "Command executable",
-    "npm",
-    uiOptions,
-  );
+  const command = await askCommandExecutable(rl, "npm", uiOptions);
   if (command === BACK) {
     return BACK;
   }
 
+  const defaultArgs =
+    index === 0 && ["npm", "pnpm", "yarn", "bun"].includes(command)
+      ? "run dev"
+      : "";
+
   const argsInput = await askWithDefault(
     rl,
     "Args (space-separated, optional)",
-    index === 0 ? "run dev" : "",
-    uiOptions,
+    defaultArgs,
+    {
+      ...uiOptions,
+      lockedPrefix: `${command} `,
+    },
   );
   if (argsInput === BACK) {
     return BACK;
@@ -651,6 +666,60 @@ async function askWithDefault(
   uiOptions: PromptUiOptions = {},
 ): Promise<PromptResult<string>> {
   return askInputBox(rl, prompt, defaultValue, uiOptions);
+}
+
+async function askCommandExecutable(
+  rl: ReturnType<typeof createInterface>,
+  defaultValue: string,
+  uiOptions: PromptUiOptions = {},
+): Promise<PromptResult<string>> {
+  const options: SelectOption<string>[] = [
+    ...COMMAND_EXECUTABLE_OPTIONS.map((command) => ({
+      label: command,
+      value: command,
+    })),
+    {
+      label: "Type manually",
+      value: CUSTOM_COMMAND_VALUE,
+    },
+  ];
+
+  const knownIndex = COMMAND_EXECUTABLE_OPTIONS.indexOf(
+    defaultValue as (typeof COMMAND_EXECUTABLE_OPTIONS)[number],
+  );
+  const selected = await askSelect(
+    rl,
+    "Command executable",
+    options,
+    knownIndex >= 0 ? knownIndex : options.length - 1,
+    uiOptions,
+  );
+
+  if (selected === BACK) {
+    return BACK;
+  }
+
+  if (selected !== CUSTOM_COMMAND_VALUE) {
+    return selected;
+  }
+
+  for (;;) {
+    const manual = await askWithDefault(
+      rl,
+      "Command executable (manual)",
+      defaultValue,
+      uiOptions,
+    );
+    if (manual === BACK) {
+      return BACK;
+    }
+
+    if (manual.trim().length > 0) {
+      return manual.trim();
+    }
+
+    console.log("Command executable cannot be empty.");
+  }
 }
 
 async function askPositiveInt(
@@ -1237,8 +1306,11 @@ async function askInputBox(
   uiOptions: PromptUiOptions = {},
 ): Promise<PromptResult<string>> {
   if (!stdin.isTTY || !stdout.isTTY) {
+    const lockedPrefix = uiOptions.lockedPrefix ?? "";
     const suffix = defaultValue ? ` (${defaultValue})` : "";
-    const answer = await rl.question(`? ${chalk.bold(prompt)}${suffix}: `);
+    const answer = await rl.question(
+      `? ${chalk.bold(prompt)}${lockedPrefix ? ` [${lockedPrefix.trim()} ...]` : ""}${suffix}: `,
+    );
     const trimmed = answer.trim();
     return trimmed || defaultValue;
   }
@@ -1248,6 +1320,7 @@ async function askInputBox(
     defaultValue,
     uiOptions.contextLines,
     ACTIVE_INIT_THEME,
+    uiOptions.lockedPrefix,
   );
   if (result.type === "back") {
     if (!uiOptions.suppressEcho) {

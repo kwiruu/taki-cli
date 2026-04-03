@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { spawn, type ChildProcess } from "node:child_process";
+import path from "node:path";
 import kill from "tree-kill";
 import { createChunkLineParser } from "../io/line-parser.js";
 import { getServiceColor } from "../ui/formatters.js";
@@ -42,6 +43,7 @@ export class ProcessManager extends EventEmitter {
   private readonly readyDeferreds = new Map<string, Deferred<void>>();
   private readonly startPromises = new Map<string, Promise<void>>();
   private readonly logHealthTrackers = new Map<string, LogHealthTracker>();
+  private readonly restartingServices = new Set<string>();
   private serviceOrder: string[] = [];
   private lineId = 0;
   private shuttingDown = false;
@@ -101,20 +103,33 @@ export class ProcessManager extends EventEmitter {
       throw new Error(`Cannot restart unknown service \"${name}\".`);
     }
 
-    const managed = this.children.get(name);
-    if (managed && managed.child.exitCode === null) {
-      this.emitSystemLog(
-        name,
-        managed.state.color,
-        "Restart requested. Stopping existing process...",
-      );
-      await this.killTree(managed.child.pid, "SIGTERM");
-      await this.waitForExit(managed.child);
-    }
+    this.restartingServices.add(name);
 
-    this.readyDeferreds.set(name, createDeferred<void>());
-    this.startPromises.delete(name);
-    this.startOne(service);
+    try {
+      const managed = this.children.get(name);
+      if (managed && managed.child.exitCode === null) {
+        this.emitSystemLog(
+          name,
+          managed.state.color,
+          "Restart requested. Stopping existing process...",
+        );
+        await this.killTree(managed.child.pid, "SIGTERM");
+        await this.waitForExit(managed.child);
+      }
+
+      this.readyDeferreds.set(name, createDeferred<void>());
+      this.startPromises.delete(name);
+      this.startOne(service);
+    } finally {
+      this.restartingServices.delete(name);
+      if (
+        !this.shuttingDown &&
+        this.restartingServices.size === 0 &&
+        !this.hasRunningChildren()
+      ) {
+        this.emit("idle");
+      }
+    }
   }
 
   hasRunningChildren(): boolean {
@@ -251,9 +266,10 @@ export class ProcessManager extends EventEmitter {
     };
 
     const usingArgs = Boolean(service.args && service.args.length > 0);
+    const shouldUseShell = shouldUseShellForCommand(service.command, usingArgs);
     const child = spawn(service.command, service.args ?? [], {
       ...spawnOptions,
-      shell: !usingArgs,
+      shell: shouldUseShell,
     });
 
     if (!child.stdout || !child.stderr) {
@@ -374,7 +390,7 @@ export class ProcessManager extends EventEmitter {
         this.states.set(service.name, state);
         this.emit("serviceState", { ...state });
 
-        if (!this.hasRunningChildren()) {
+        if (!this.hasRunningChildren() && this.restartingServices.size === 0) {
           this.emit("idle");
         }
       },
@@ -560,3 +576,34 @@ function delay(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
+
+function shouldUseShellForCommand(
+  command: string,
+  usingArgs: boolean,
+): boolean {
+  if (!usingArgs) {
+    // A single command string (no args array) relies on shell parsing.
+    return true;
+  }
+
+  if (process.platform !== "win32") {
+    return false;
+  }
+
+  const commandExt = path.extname(command).toLowerCase();
+  if (commandExt === ".cmd" || commandExt === ".bat") {
+    return true;
+  }
+
+  const base = path.basename(command, commandExt).toLowerCase();
+  return WINDOWS_COMMAND_SHIMS.has(base);
+}
+
+const WINDOWS_COMMAND_SHIMS = new Set([
+  "npm",
+  "npx",
+  "pnpm",
+  "yarn",
+  "yarnpkg",
+  "corepack",
+]);
