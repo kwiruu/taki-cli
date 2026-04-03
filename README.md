@@ -101,6 +101,17 @@ Use `o` to open options and configure layout:
 - horizontal panes (configurable count)
 - grid panes (configurable columns and rows)
 
+## Theme Options
+
+Use `o` -> `Choose theme` while running the dashboard.
+
+Available presets include both VS Code-like and terminal themes, such as:
+
+- VS Code: Dark+, Light+, Monokai, GitHub Dark, GitHub Light
+- Terminal: Gruvbox Dark, Solarized Dark/Light, Nord, Dracula, One Dark
+
+Theme choice is saved into `taki.json` under `ui.theme`.
+
 ## Config File (`taki.json`)
 
 Example:
@@ -132,7 +143,10 @@ Example:
       }
     }
   ],
-  "maxLogLines": 200
+  "maxLogLines": 200,
+  "ui": {
+    "theme": "vscode-dark-plus"
+  }
 }
 ```
 

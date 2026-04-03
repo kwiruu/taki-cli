@@ -8,6 +8,28 @@ export type ServiceColor =
   | "white"
   | "gray";
 
+export type ThemePresetId =
+  | "default-white"
+  | "basic-blue"
+  | "basic-red"
+  | "basic-cyan"
+  | "basic-pink"
+  | "vscode-dark-plus"
+  | "vscode-light-plus"
+  | "vscode-monokai"
+  | "vscode-github-dark"
+  | "vscode-github-light"
+  | "terminal-gruvbox-dark"
+  | "terminal-solarized-dark"
+  | "terminal-solarized-light"
+  | "terminal-nord"
+  | "terminal-dracula"
+  | "terminal-one-dark";
+
+export interface UiConfig {
+  theme?: ThemePresetId;
+}
+
 export interface ServiceConfig {
   name: string;
   command: string;
@@ -35,6 +57,7 @@ export type HealthCheckConfig =
 export interface TakiConfig {
   services: ServiceConfig[];
   maxLogLines?: number;
+  ui?: UiConfig;
 }
 
 export type LogSource = "stdout" | "stderr" | "system";

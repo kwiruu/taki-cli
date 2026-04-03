@@ -9,8 +9,15 @@ import type {
   ServiceColor,
   ServiceConfig,
   TakiConfig,
+  ThemePresetId,
 } from "../types/index.js";
-import { loadConfig } from "./config.js";
+import type { ChalkColorToken } from "../theme/index.js";
+import {
+  applyChalkColor,
+  DEFAULT_THEME_PRESET_ID,
+  getThemePreset,
+} from "../theme/index.js";
+import { loadConfig, readConfigThemePreference } from "./config.js";
 import { askInkInputPrompt, askInkSelectPrompt } from "../ui/init-prompts.js";
 
 const DEFAULT_COLORS: ServiceColor[] = [
@@ -32,8 +39,9 @@ const FALLBACK_INIT_CAT = [
 ];
 
 const INIT_CAT = loadInitCatLines();
-const CAT_ORANGE = "#00ff8a";
 const TAKI_VERSION = "v0.1.0";
+let ACTIVE_THEME_ID: ThemePresetId = DEFAULT_THEME_PRESET_ID;
+let ACTIVE_INIT_THEME = getThemePreset(DEFAULT_THEME_PRESET_ID).init;
 
 const BACK = Symbol("BACK");
 
@@ -71,17 +79,29 @@ interface PromptUiOptions {
   suppressEcho?: boolean;
 }
 
+function paintInit(color: ChalkColorToken, value: string): string {
+  return applyChalkColor(color, value);
+}
+
 export async function runInteractiveInit(options: InitOptions): Promise<void> {
   const rootDir = options.cwd ?? process.cwd();
   const configPath = path.resolve(rootDir, options.configPath);
   const displayPath = path.relative(rootDir, configPath) || "taki.json";
+  const configuredTheme = await readConfigThemePreference(configPath);
+  ACTIVE_THEME_ID = configuredTheme ?? DEFAULT_THEME_PRESET_ID;
+  ACTIVE_INIT_THEME = getThemePreset(ACTIVE_THEME_ID).init;
   const useInkTty = stdin.isTTY && stdout.isTTY;
   const rl = createInterface({ input: stdin, output: stdout });
 
   try {
     const shouldWrite = await canWriteConfig(configPath, options.force, rl);
     if (!shouldWrite) {
-      console.log(chalk.yellow("Init canceled. No files were changed."));
+      console.log(
+        paintInit(
+          ACTIVE_INIT_THEME.warningColor,
+          "Init canceled. No files were changed.",
+        ),
+      );
       return;
     }
 
@@ -291,6 +311,9 @@ export async function runInteractiveInit(options: InitOptions): Promise<void> {
         const config: TakiConfig = {
           services: draft.services,
           maxLogLines: draft.maxLogLines,
+          ui: {
+            theme: ACTIVE_THEME_ID,
+          },
         };
 
         await fs.writeFile(
@@ -300,14 +323,16 @@ export async function runInteractiveInit(options: InitOptions): Promise<void> {
         );
         await loadConfig(configPath);
 
-        console.log(`\n${chalk.green("Created")}: ${chalk.green(displayPath)}`);
+        console.log(
+          `\n${paintInit(ACTIVE_INIT_THEME.successColor, "Created")}: ${paintInit(ACTIVE_INIT_THEME.successColor, displayPath)}`,
+        );
 
         if (draft.setupScript) {
           await maybeSetupPackageScript(rl, rootDir, options.configPath);
         }
 
         console.log(
-          `\n${chalk.bold("Next step")}: ${chalk.green(formatRunCommand(options.configPath))}`,
+          `\n${chalk.bold("Next step")}: ${paintInit(ACTIVE_INIT_THEME.successColor, formatRunCommand(options.configPath))}`,
         );
         return;
       }
@@ -611,7 +636,12 @@ async function maybeSetupPackageScript(
     `${JSON.stringify(packageJson, null, 2)}\n`,
     "utf8",
   );
-  console.log(chalk.green("Updated package.json scripts.taki"));
+  console.log(
+    paintInit(
+      ACTIVE_INIT_THEME.successColor,
+      "Updated package.json scripts.taki",
+    ),
+  );
 }
 
 async function askWithDefault(
@@ -812,11 +842,12 @@ async function askSelect<T>(
     options,
     safeDefaultIndex,
     uiOptions.contextLines,
+    ACTIVE_INIT_THEME,
   );
   if (result.type === "back") {
     if (!uiOptions.suppressEcho) {
       console.log(
-        `${chalk.yellow("↩")} ${chalk.bold(prompt)}: ${chalk.gray("back")}`,
+        `${paintInit(ACTIVE_INIT_THEME.warningColor, "↩")} ${chalk.bold(prompt)}: ${paintInit(ACTIVE_INIT_THEME.mutedColor, "back")}`,
       );
     }
     return BACK;
@@ -827,57 +858,11 @@ async function askSelect<T>(
     ? colorizeByServiceColor(selected.label, selected.color)
     : String(result.value);
   if (!uiOptions.suppressEcho) {
-    console.log(`${chalk.green("✔")} ${chalk.bold(prompt)}: ${chosen}`);
+    console.log(
+      `${paintInit(ACTIVE_INIT_THEME.successColor, "✔")} ${chalk.bold(prompt)}: ${chosen}`,
+    );
   }
   return result.value;
-}
-
-function buildSelectBox<T>(
-  prompt: string,
-  options: SelectOption<T>[],
-  selectedIndex: number,
-): string[] {
-  const hint = "Use ↑/↓ Enter, ←/Esc back";
-  const contentWidth = getWizardContentWidth();
-
-  const promptText = truncateText(prompt, contentWidth);
-  const hintText = truncateText(hint, contentWidth);
-
-  const lines: string[] = [
-    panelTop(contentWidth),
-    formatPanelLine(
-      chalk.bold(promptText),
-      Math.min(prompt.length, contentWidth),
-      contentWidth,
-    ),
-    formatPanelLine(
-      chalk.gray(hintText),
-      Math.min(hint.length, contentWidth),
-      contentWidth,
-    ),
-    panelDivider(contentWidth),
-  ];
-
-  for (let index = 0; index < options.length; index += 1) {
-    const option = options[index];
-    const selected = index === selectedIndex;
-    const marker = selected ? chalk.greenBright(">") : " ";
-    const optionLabel = truncateText(
-      option.label,
-      Math.max(1, contentWidth - 2),
-    );
-    const plain = `${selected ? ">" : " "} ${optionLabel}`;
-
-    let content = `${marker} ${colorizeByServiceColor(optionLabel, option.color)}`;
-    if (selected) {
-      content = chalk.bold(content);
-    }
-
-    lines.push(formatPanelLine(content, plain.length, contentWidth));
-  }
-
-  lines.push(panelBottom(contentWidth));
-  return lines;
 }
 
 function formatPanelLine(
@@ -919,11 +904,20 @@ async function printBanner(configDisplayPath: string): Promise<void> {
   const catFrame = INIT_CAT;
   const catWidth = Math.max(...catFrame.map((line) => line.length));
   const rightColumn = [
-    chalk.gray("────────────────────────────────"),
-    `${chalk.bold("TAKI INIT")} ${chalk.gray(TAKI_VERSION)}`,
-    chalk.gray("Interactive setup for your local service workspace."),
-    chalk.gray(`Config target: ${configDisplayPath}`),
-    chalk.gray("Tip: ← or Esc goes back one step."),
+    paintInit(ACTIVE_INIT_THEME.mutedColor, "────────────────────────────────"),
+    `${paintInit(ACTIVE_INIT_THEME.accentColor, chalk.bold("TAKI INIT"))} ${paintInit(ACTIVE_INIT_THEME.mutedColor, TAKI_VERSION)}`,
+    paintInit(
+      ACTIVE_INIT_THEME.mutedColor,
+      "Interactive setup for your local service workspace.",
+    ),
+    paintInit(
+      ACTIVE_INIT_THEME.mutedColor,
+      `Config target: ${configDisplayPath}`,
+    ),
+    paintInit(
+      ACTIVE_INIT_THEME.mutedColor,
+      "Tip: ← or Esc goes back one step.",
+    ),
   ];
 
   console.log();
@@ -934,7 +928,9 @@ async function printBanner(configDisplayPath: string): Promise<void> {
   ) {
     const catLine = (catFrame[index] ?? "").padEnd(catWidth, " ");
     const infoLine = rightColumn[index] ?? "";
-    console.log(`${chalk.hex(CAT_ORANGE)(catLine)}  ${infoLine}`);
+    console.log(
+      `${paintInit(ACTIVE_INIT_THEME.catColor, catLine)}  ${infoLine}`,
+    );
   }
   console.log();
 }
@@ -954,8 +950,8 @@ function printStepHeader(
 
   const rightColumn = [
     chalk.bold(title),
-    chalk.gray("Navigate with arrow keys"),
-    chalk.gray("Use ← or Esc to go back"),
+    paintInit(ACTIVE_INIT_THEME.mutedColor, "Navigate with arrow keys"),
+    paintInit(ACTIVE_INIT_THEME.mutedColor, "Use ← or Esc to go back"),
   ];
 
   const catWidth = Math.max(...frame.map((line) => line.length));
@@ -965,7 +961,7 @@ function printStepHeader(
   for (let index = 0; index < totalLines; index += 1) {
     const catLine = (frame[index] ?? "").padEnd(catWidth, " ");
     const info = rightColumn[index] ?? "";
-    console.log(`${chalk.hex(CAT_ORANGE)(catLine)}  ${info}`);
+    console.log(`${paintInit(ACTIVE_INIT_THEME.catColor, catLine)}  ${info}`);
   }
 }
 
@@ -979,11 +975,16 @@ function buildInkContextLines(
   const frame = INIT_CAT;
 
   const rightColumn = [
-    chalk.gray(""),
-    `${chalk.bold.green("TAKI INIT")} ${chalk.gray(TAKI_VERSION)}`,
-    chalk.gray(`Config target: ${configDisplayPath}`),
-    chalk.bold(`${title} (${step}/${totalSteps})`),
-    chalk.gray("Use ← or Esc to go back"),
+    `${paintInit(ACTIVE_INIT_THEME.accentColor, chalk.bold("TAKI INIT"))} ${paintInit(ACTIVE_INIT_THEME.mutedColor, TAKI_VERSION)}`,
+    paintInit(
+      ACTIVE_INIT_THEME.mutedColor,
+      `Config target: ${configDisplayPath}`,
+    ),
+    paintInit(
+      ACTIVE_INIT_THEME.accentColor,
+      chalk.bold(`${title} (${step}/${totalSteps})`),
+    ),
+    paintInit(ACTIVE_INIT_THEME.mutedColor, "Use ← or Esc to go back"),
   ];
 
   const catWidth = Math.max(...frame.map((line) => line.length));
@@ -993,7 +994,7 @@ function buildInkContextLines(
   for (let index = 0; index < totalLines; index += 1) {
     const catLine = (frame[index] ?? "").padEnd(catWidth, " ");
     const info = rightColumn[index] ?? "";
-    lines.push(`${chalk.hex(CAT_ORANGE)(catLine)}  ${info}`);
+    lines.push(`${paintInit(ACTIVE_INIT_THEME.catColor, catLine)}  ${info}`);
   }
 
   lines.push("");
@@ -1037,27 +1038,32 @@ function buildPreviewPanelLines(
     maxLogLines: draft.maxLogLines,
   };
 
-  const previewTitle = `Preview taki.json (Step ${step}/${totalSteps})`;
+  const previewTitle = `Preview taki.json`;
   const previewBody = JSON.stringify(previewConfig, null, 2).split("\n");
   const maxLineLength = getWizardContentWidth();
   const lines: string[] = [
-    chalk.gray(panelTop(maxLineLength)),
-    chalk.gray(
+    paintInit(ACTIVE_INIT_THEME.mutedColor, panelTop(maxLineLength)),
+    paintInit(
+      ACTIVE_INIT_THEME.mutedColor,
       formatPanelLine(
-        chalk.bold(truncateText(previewTitle, maxLineLength)),
+        paintInit(
+          ACTIVE_INIT_THEME.accentColor,
+          chalk.bold(truncateText(previewTitle, maxLineLength)),
+        ),
         Math.min(previewTitle.length, maxLineLength),
         maxLineLength,
       ),
     ),
-    chalk.gray(panelDivider(maxLineLength)),
+    paintInit(ACTIVE_INIT_THEME.mutedColor, panelDivider(maxLineLength)),
   ];
 
   for (const line of previewBody) {
     const truncated = truncateText(line, maxLineLength);
     lines.push(
-      chalk.gray(
+      paintInit(
+        ACTIVE_INIT_THEME.mutedColor,
         formatPanelLine(
-          chalk.green(truncated),
+          paintInit(ACTIVE_INIT_THEME.contentColor, truncated),
           Math.min(line.length, maxLineLength),
           maxLineLength,
         ),
@@ -1065,7 +1071,9 @@ function buildPreviewPanelLines(
     );
   }
 
-  lines.push(chalk.gray(panelBottom(maxLineLength)));
+  lines.push(
+    paintInit(ACTIVE_INIT_THEME.mutedColor, panelBottom(maxLineLength)),
+  );
   return lines;
 }
 
@@ -1092,17 +1100,20 @@ function buildCompactPreviewLines(
   ];
 
   const maxLineLength = getWizardContentWidth();
-  const lines: string[] = [chalk.gray(panelTop(maxLineLength))];
+  const lines: string[] = [
+    paintInit(ACTIVE_INIT_THEME.mutedColor, panelTop(maxLineLength)),
+  ];
   for (const [index, line] of compactLines.entries()) {
     const truncated = truncateText(line, maxLineLength);
     const colorized =
       index === 0
-        ? chalk.bold(truncated)
+        ? paintInit(ACTIVE_INIT_THEME.accentColor, chalk.bold(truncated))
         : index === compactLines.length - 1
-          ? chalk.gray(truncated)
-          : chalk.green(truncated);
+          ? paintInit(ACTIVE_INIT_THEME.mutedColor, truncated)
+          : paintInit(ACTIVE_INIT_THEME.contentColor, truncated);
     lines.push(
-      chalk.gray(
+      paintInit(
+        ACTIVE_INIT_THEME.mutedColor,
         formatPanelLine(
           colorized,
           Math.min(line.length, maxLineLength),
@@ -1111,10 +1122,14 @@ function buildCompactPreviewLines(
       ),
     );
     if (index === 0) {
-      lines.push(chalk.gray(panelDivider(maxLineLength)));
+      lines.push(
+        paintInit(ACTIVE_INIT_THEME.mutedColor, panelDivider(maxLineLength)),
+      );
     }
   }
-  lines.push(chalk.gray(panelBottom(maxLineLength)));
+  lines.push(
+    paintInit(ACTIVE_INIT_THEME.mutedColor, panelBottom(maxLineLength)),
+  );
   return lines;
 }
 
@@ -1123,95 +1138,9 @@ function renderPreview(
   step: number,
   totalSteps: number,
 ): void {
-  const metrics = getTerminalMetrics();
-  const mode = getPreviewMode(draft, metrics);
-
-  if (mode === "compact") {
-    renderCompactPreview(draft, step, totalSteps, metrics);
-    return;
+  for (const line of buildPreviewPanelLines(draft, step, totalSteps)) {
+    console.log(line);
   }
-
-  const previewConfig: TakiConfig = {
-    services: draft.services,
-    maxLogLines: draft.maxLogLines,
-  };
-
-  const previewTitle = `Preview taki.json (Step ${step}/${totalSteps})`;
-  const previewBody = JSON.stringify(previewConfig, null, 2).split("\n");
-  const maxLineLength = getWizardContentWidth();
-
-  console.log(chalk.gray(panelTop(maxLineLength)));
-  console.log(
-    chalk.gray(
-      formatPanelLine(
-        chalk.bold(truncateText(previewTitle, maxLineLength)),
-        Math.min(previewTitle.length, maxLineLength),
-        maxLineLength,
-      ),
-    ),
-  );
-  console.log(chalk.gray(panelDivider(maxLineLength)));
-  for (const line of previewBody) {
-    const truncated = truncateText(line, maxLineLength);
-    console.log(
-      chalk.gray(
-        formatPanelLine(
-          chalk.green(truncated),
-          Math.min(line.length, maxLineLength),
-          maxLineLength,
-        ),
-      ),
-    );
-  }
-  console.log(chalk.gray(panelBottom(maxLineLength)));
-}
-
-function renderCompactPreview(
-  draft: InitDraft,
-  step: number,
-  totalSteps: number,
-  metrics: TerminalMetrics,
-): void {
-  const serviceNames = draft.services
-    .map((service) => service.name)
-    .filter(Boolean);
-  const serviceLabel =
-    serviceNames.length > 0
-      ? `${serviceNames.slice(0, 3).join(", ")}${serviceNames.length > 3 ? ` +${serviceNames.length - 3} more` : ""}`
-      : "(none yet)";
-
-  const lines = [
-    `Preview taki.json (Step ${step}/${totalSteps})`,
-    `mode: compact (${metrics.columns}x${metrics.rows})`,
-    `services: ${draft.services.length}/${draft.serviceCount} -> ${serviceLabel}`,
-    `maxLogLines: ${draft.maxLogLines}`,
-    "Tip: enlarge terminal for full JSON preview",
-  ];
-
-  const maxLineLength = getWizardContentWidth();
-  console.log(chalk.gray(panelTop(maxLineLength)));
-  for (const [index, line] of lines.entries()) {
-    const truncated = truncateText(line, maxLineLength);
-    const colorized =
-      index === 0
-        ? chalk.bold(truncated)
-        : index === lines.length - 1
-          ? chalk.gray(truncated)
-          : chalk.green(truncated);
-    console.log(
-      chalk.gray(
-        formatPanelLine(
-          colorized,
-          Math.min(line.length, maxLineLength),
-          maxLineLength,
-        ),
-      ),
-    );
-    if (index === 0) {
-      console.log(chalk.gray(panelDivider(maxLineLength)));
-    }
-  }
-  console.log(chalk.gray(panelBottom(maxLineLength)));
 }
 
 function getTerminalMetrics(): TerminalMetrics {
@@ -1309,9 +1238,7 @@ async function askInputBox(
 ): Promise<PromptResult<string>> {
   if (!stdin.isTTY || !stdout.isTTY) {
     const suffix = defaultValue ? ` (${defaultValue})` : "";
-    const answer = await rl.question(
-      `${chalk.green("?")} ${chalk.bold(prompt)}${suffix}: `,
-    );
+    const answer = await rl.question(`? ${chalk.bold(prompt)}${suffix}: `);
     const trimmed = answer.trim();
     return trimmed || defaultValue;
   }
@@ -1320,11 +1247,12 @@ async function askInputBox(
     prompt,
     defaultValue,
     uiOptions.contextLines,
+    ACTIVE_INIT_THEME,
   );
   if (result.type === "back") {
     if (!uiOptions.suppressEcho) {
       console.log(
-        `${chalk.yellow("↩")} ${chalk.bold(prompt)}: ${chalk.gray("back")}`,
+        `${paintInit(ACTIVE_INIT_THEME.warningColor, "↩")} ${chalk.bold(prompt)}: ${paintInit(ACTIVE_INIT_THEME.mutedColor, "back")}`,
       );
     }
     return BACK;
@@ -1332,43 +1260,10 @@ async function askInputBox(
 
   if (!uiOptions.suppressEcho) {
     console.log(
-      `${chalk.green("✔")} ${chalk.bold(prompt)}: ${chalk.green(result.value || "(empty)")}`,
+      `${paintInit(ACTIVE_INIT_THEME.successColor, "✔")} ${chalk.bold(prompt)}: ${paintInit(ACTIVE_INIT_THEME.contentColor, result.value || "(empty)")}`,
     );
   }
   return result.value;
-}
-
-function buildInputBox(
-  prompt: string,
-  value: string,
-  defaultValue: string,
-): string[] {
-  const hint = "Type value, Enter confirm, ←/Esc back";
-  const contentWidth = getWizardContentWidth();
-  const promptText = truncateText(prompt, contentWidth);
-  const hintText = truncateText(hint, contentWidth);
-  const fieldWidth = Math.max(1, contentWidth - 2);
-  const textWidth = Math.max(0, fieldWidth - 1);
-  const cursor = chalk.greenBright("▌");
-  const visibleValue = truncateText(value, textWidth).padEnd(textWidth, " ");
-  const valueLabel = `> ${chalk.green(visibleValue)}${cursor}`;
-
-  return [
-    panelTop(contentWidth),
-    formatPanelLine(
-      chalk.bold(promptText),
-      Math.min(prompt.length, contentWidth),
-      contentWidth,
-    ),
-    formatPanelLine(
-      chalk.gray(hintText),
-      Math.min(hint.length, contentWidth),
-      contentWidth,
-    ),
-    panelDivider(contentWidth),
-    formatPanelLine(chalk.green(valueLabel), contentWidth, contentWidth),
-    panelBottom(contentWidth),
-  ];
 }
 
 function getWizardContentWidth(): number {
@@ -1399,16 +1294,4 @@ function panelDivider(width: number): string {
 
 function panelBottom(width: number): string {
   return `╰${"─".repeat(width + 2)}╯`;
-}
-
-function drainStdinBuffer(input: NodeJS.ReadStream): void {
-  while (input.read() !== null) {
-    // Drain buffered keypress data so stale Enter cannot auto-submit prompts.
-  }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

@@ -3,7 +3,12 @@ import { Box, Text, useInput, useStdout } from "ink";
 import { Header } from "./components/header.js";
 import { LogView } from "./components/log-view.js";
 import { RingBuffer } from "../io/ring-buffer.js";
-import type { LogEntry, ServiceState } from "../types/index.js";
+import {
+  DEFAULT_THEME_PRESET_ID,
+  getThemePreset,
+  getThemePresetChoices,
+} from "../theme/index.js";
+import type { LogEntry, ServiceState, ThemePresetId } from "../types/index.js";
 import type { ProcessManager } from "../core/process-manager.js";
 
 interface AppProps {
@@ -11,6 +16,8 @@ interface AppProps {
   logBuffer: RingBuffer<LogEntry>;
   startedAt: number;
   maxDisplayLines: number;
+  initialThemeId?: ThemePresetId;
+  onThemeChange?: (theme: ThemePresetId) => Promise<void>;
   onQuitRequest: () => void;
 }
 
@@ -20,7 +27,7 @@ interface Dimensions {
 }
 
 type ViewMode = "normal" | "options" | "full-log";
-type OptionsMenu = "root" | "layout" | "count" | "grid";
+type OptionsMenu = "root" | "layout" | "count" | "grid" | "theme";
 type LayoutMode = "single" | "vertical" | "horizontal" | "grid";
 
 const MIN_PANES = 1;
@@ -55,6 +62,8 @@ export function App({
   logBuffer,
   startedAt,
   maxDisplayLines,
+  initialThemeId,
+  onThemeChange,
   onQuitRequest,
 }: AppProps): React.JSX.Element {
   const { stdout } = useStdout();
@@ -72,9 +81,17 @@ export function App({
   const [viewMode, setViewMode] = useState<ViewMode>("normal");
   const [optionsMenu, setOptionsMenu] = useState<OptionsMenu>("root");
   const [optionsIndex, setOptionsIndex] = useState(0);
+  const [themeId, setThemeId] = useState<ThemePresetId>(
+    initialThemeId ?? DEFAULT_THEME_PRESET_ID,
+  );
+  const [previewThemeId, setPreviewThemeId] = useState<ThemePresetId>();
   const [isRestarting, setIsRestarting] = useState(false);
   const [dimensions, setDimensions] = useState<Dimensions>(
     getDimensions(stdout),
+  );
+  const activeTheme = useMemo(
+    () => getThemePreset(previewThemeId ?? themeId),
+    [previewThemeId, themeId],
   );
 
   const serviceNames = useMemo(
@@ -148,14 +165,41 @@ export function App({
       layoutMode === "grid"
         ? `Configure grid (${gridColumns} cols x ${gridRows} rows)`
         : `Configure pane count (${paneCount})`;
+    const themeLabel = `Choose theme (${activeTheme.label})`;
 
     return [
       ROOT_OPTIONS_BASE[0],
       ROOT_OPTIONS_BASE[1],
       amountLabel,
+      themeLabel,
       ROOT_OPTIONS_BASE[3],
     ];
-  }, [gridColumns, gridRows, layoutMode, paneCount]);
+  }, [activeTheme.label, gridColumns, gridRows, layoutMode, paneCount]);
+
+  const themeOptions = useMemo(() => {
+    const nextOptions: Array<{ label: string; value: ThemePresetId | "back" }> =
+      getThemePresetChoices().map((preset) => {
+        const activeSuffix =
+          preset.id === themeId && preset.id === previewThemeId
+            ? " (active)"
+            : preset.id === previewThemeId
+              ? " (preview)"
+              : preset.id === themeId
+                ? " (active)"
+                : "";
+        return {
+          label: `${preset.family}: ${preset.label}${activeSuffix}`,
+          value: preset.id,
+        };
+      });
+
+    nextOptions.push({
+      label: "Back",
+      value: "back" as const,
+    });
+
+    return nextOptions;
+  }, [previewThemeId, themeId]);
 
   const countOptions = useMemo(() => {
     const options: string[] = [];
@@ -179,11 +223,20 @@ export function App({
           "Apply grid layout",
           "Back",
         ];
+      case "theme":
+        return themeOptions.map((option) => option.label);
       case "root":
       default:
         return rootOptions;
     }
-  }, [countOptions, gridColumns, gridRows, optionsMenu, rootOptions]);
+  }, [
+    countOptions,
+    gridColumns,
+    gridRows,
+    optionsMenu,
+    rootOptions,
+    themeOptions,
+  ]);
 
   const paneEntries = useMemo(
     () =>
@@ -239,6 +292,7 @@ export function App({
   };
 
   const closeOptions = (): void => {
+    setPreviewThemeId(undefined);
     setViewMode("normal");
     setOptionsMenu("root");
     setOptionsIndex(0);
@@ -295,6 +349,9 @@ export function App({
     if (viewMode === "options") {
       if (key.escape) {
         if (optionsMenu !== "root") {
+          if (optionsMenu === "theme") {
+            setPreviewThemeId(undefined);
+          }
           setOptionsMenu("root");
           setOptionsIndex(0);
         } else {
@@ -353,6 +410,16 @@ export function App({
               setOptionsMenu(layoutMode === "grid" ? "grid" : "count");
               setOptionsIndex(0);
               return;
+            case 3:
+              setOptionsMenu("theme");
+              setOptionsIndex(
+                Math.max(
+                  0,
+                  themeOptions.findIndex((option) => option.value === themeId),
+                ),
+              );
+              setPreviewThemeId(themeId);
+              return;
             default:
               closeOptions();
               return;
@@ -407,6 +474,26 @@ export function App({
             setOptionsIndex(0);
             return;
           }
+        }
+
+        if (optionsMenu === "theme") {
+          const selected = themeOptions[optionsIndex];
+          if (!selected || selected.value === "back") {
+            setPreviewThemeId(undefined);
+            setOptionsMenu("root");
+            setOptionsIndex(0);
+            return;
+          }
+
+          setThemeId(selected.value);
+          setPreviewThemeId(undefined);
+          if (onThemeChange) {
+            void onThemeChange(selected.value).catch(() => {
+              // Ignore persistence failures and keep live theme in session.
+            });
+          }
+          closeOptions();
+          return;
         }
       }
 
@@ -540,6 +627,21 @@ export function App({
     );
   }, [activePaneCountSafe]);
 
+  useEffect(() => {
+    if (viewMode !== "options" || optionsMenu !== "theme") {
+      setPreviewThemeId(undefined);
+      return;
+    }
+
+    const selected = themeOptions[optionsIndex];
+    if (!selected || selected.value === "back") {
+      setPreviewThemeId(themeId);
+      return;
+    }
+
+    setPreviewThemeId(selected.value);
+  }, [optionsIndex, optionsMenu, themeId, themeOptions, viewMode]);
+
   const controlsText =
     viewMode === "options"
       ? optionsMenu === "grid"
@@ -558,7 +660,9 @@ export function App({
         ? "Options > Layout"
         : optionsMenu === "count"
           ? "Options > Pane Count"
-          : "Options > Grid";
+          : optionsMenu === "theme"
+            ? "Options > Theme"
+            : "Options > Grid";
 
   const rowChunks = useMemo(() => {
     const rows: number[][] = [];
@@ -585,16 +689,21 @@ export function App({
     viewMode === "options" ? (
       <Box
         flexDirection="column"
-        borderStyle="round"
-        borderColor="green"
+        borderStyle={activeTheme.run.borderStyle}
+        borderColor={activeTheme.run.optionsBorderColor}
         paddingX={1}
         flexGrow={1}
       >
-        <Text color="greenBright">{optionsTitle}</Text>
+        <Text color={activeTheme.run.optionsTitleColor}>{optionsTitle}</Text>
         {options.map((label, index) => {
           const selected = index === optionsIndex;
           return (
-            <Text key={label} color={selected ? "greenBright" : undefined}>
+            <Text
+              key={label}
+              color={
+                selected ? activeTheme.run.optionsSelectedColor : undefined
+              }
+            >
               {`${selected ? ">" : " "} ${label}`}
             </Text>
           );
@@ -613,7 +722,7 @@ export function App({
         entries={paneEntries[0] ?? []}
         maxVisibleRows={baseVisibleRows}
         width={dimensions.columns}
-        borderColor="green"
+        borderColor={activeTheme.run.paneFocusedBorderColor}
       />
     ) : layoutMode === "grid" ? (
       <Box flexDirection="column" flexGrow={1}>
@@ -627,7 +736,11 @@ export function App({
                     entries={paneEntries[paneIndex] ?? []}
                     maxVisibleRows={paneRows}
                     width={paneWidth}
-                    borderColor={focused ? "green" : "gray"}
+                    borderColor={
+                      focused
+                        ? activeTheme.run.paneFocusedBorderColor
+                        : activeTheme.run.paneUnfocusedBorderColor
+                    }
                     emptyMessage="No logs for this pane yet."
                   />
                 </Box>
@@ -651,7 +764,11 @@ export function App({
                 width={
                   layoutMode === "vertical" ? paneWidth : dimensions.columns
                 }
-                borderColor={focused ? "green" : "gray"}
+                borderColor={
+                  focused
+                    ? activeTheme.run.paneFocusedBorderColor
+                    : activeTheme.run.paneUnfocusedBorderColor
+                }
                 emptyMessage="No logs for this pane yet."
               />
             </Box>
@@ -669,10 +786,11 @@ export function App({
           now={now}
           selectedServiceName={selectedServiceName}
           isSplitMode={activePaneCountSafe > 1}
+          theme={activeTheme.run}
         />
       )}
       {logsSurface}
-      <Text dimColor>
+      <Text color={activeTheme.run.footerColor}>
         {isRestarting ? "Restarting selected service..." : controlsText}
       </Text>
     </Box>

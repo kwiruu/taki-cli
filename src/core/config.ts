@@ -1,7 +1,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import type { TakiConfig } from "../types/index.js";
+import { isThemePresetId, THEME_PRESET_IDS } from "../theme/index.js";
+import type { TakiConfig, ThemePresetId } from "../types/index.js";
 
 const healthCheckSchema = z.discriminatedUnion("type", [
   z.object({
@@ -41,11 +42,18 @@ const serviceSchema = z.object({
   healthCheck: healthCheckSchema.optional(),
 });
 
+const uiSchema = z
+  .object({
+    theme: z.enum(THEME_PRESET_IDS).optional(),
+  })
+  .optional();
+
 const configSchema = z.object({
   services: z
     .array(serviceSchema)
     .min(1, "Add at least one service in taki.json."),
   maxLogLines: z.number().int().positive().max(5000).optional(),
+  ui: uiSchema,
 });
 
 export async function loadConfig(configPath: string): Promise<TakiConfig> {
@@ -107,6 +115,88 @@ export async function loadConfig(configPath: string): Promise<TakiConfig> {
   }
 
   return result.data;
+}
+
+export async function readConfigThemePreference(
+  configPath: string,
+): Promise<ThemePresetId | undefined> {
+  const parsed = await readRawConfigObject(configPath);
+  if (!parsed) {
+    return undefined;
+  }
+
+  const rootTheme = parsed.theme;
+  if (typeof rootTheme === "string" && isThemePresetId(rootTheme)) {
+    return rootTheme;
+  }
+
+  const uiValue = parsed.ui;
+  if (!uiValue || typeof uiValue !== "object" || Array.isArray(uiValue)) {
+    return undefined;
+  }
+
+  const theme = (uiValue as Record<string, unknown>).theme;
+  if (typeof theme === "string" && isThemePresetId(theme)) {
+    return theme;
+  }
+
+  return undefined;
+}
+
+export async function setConfigThemePreference(
+  configPath: string,
+  theme: ThemePresetId,
+): Promise<void> {
+  const absolutePath = path.resolve(configPath);
+  const parsed = await readRawConfigObject(configPath);
+  if (!parsed) {
+    throw new Error(
+      `Unable to update theme: ${absolutePath} is missing or invalid JSON.`,
+    );
+  }
+
+  const nextConfig: Record<string, unknown> = { ...parsed };
+  const currentUi =
+    parsed.ui && typeof parsed.ui === "object" && !Array.isArray(parsed.ui)
+      ? (parsed.ui as Record<string, unknown>)
+      : {};
+
+  nextConfig.ui = {
+    ...currentUi,
+    theme,
+  };
+
+  await fs.writeFile(
+    absolutePath,
+    `${JSON.stringify(nextConfig, null, 2)}\n`,
+    "utf8",
+  );
+}
+
+async function readRawConfigObject(
+  configPath: string,
+): Promise<Record<string, unknown> | undefined> {
+  const absolutePath = path.resolve(configPath);
+
+  let rawText: string;
+  try {
+    rawText = await fs.readFile(absolutePath, "utf8");
+  } catch {
+    return undefined;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    return undefined;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return undefined;
+  }
+
+  return parsed as Record<string, unknown>;
 }
 
 function findDuplicateNames(names: string[]): string[] {

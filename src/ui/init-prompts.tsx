@@ -2,6 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, render, useInput, useStdout } from "ink";
 import readline from "node:readline";
 import chalk from "chalk";
+import {
+  applyChalkColor,
+  DEFAULT_THEME_PRESET_ID,
+  getThemePreset,
+} from "../theme/index.js";
+import type { InitThemeTokens } from "../theme/index.js";
 import type { ServiceColor } from "../types/index.js";
 
 export interface InkSelectOption<T> {
@@ -19,6 +25,7 @@ export async function askInkSelectPrompt<T>(
   options: InkSelectOption<T>[],
   defaultIndex: number,
   contextLines: string[] = [],
+  theme: InitThemeTokens = getThemePreset(DEFAULT_THEME_PRESET_ID).init,
 ): Promise<InkPromptResult<T>> {
   return await new Promise<InkPromptResult<T>>((resolve) => {
     let done = false;
@@ -89,12 +96,12 @@ export async function askInkSelectPrompt<T>(
         const nextLines: string[] = [
           panelTop(width),
           formatPanelLine(
-            chalk.bold(promptText),
+            applyChalkColor(theme.accentColor, chalk.bold(promptText)),
             Math.min(prompt.length, width),
             width,
           ),
           formatPanelLine(
-            chalk.gray(hintText),
+            applyChalkColor(theme.mutedColor, hintText),
             Math.min(hint.length, width),
             width,
           ),
@@ -104,7 +111,9 @@ export async function askInkSelectPrompt<T>(
         for (let index = 0; index < options.length; index += 1) {
           const option = options[index];
           const selected = index === selectedIndex;
-          const marker = selected ? chalk.greenBright(">") : " ";
+          const marker = selected
+            ? applyChalkColor(theme.accentStrongColor, ">")
+            : " ";
           const optionLabel = truncateText(
             option.label,
             Math.max(1, width - 2),
@@ -143,6 +152,7 @@ export async function askInkInputPrompt(
   prompt: string,
   defaultValue: string,
   contextLines: string[] = [],
+  theme: InitThemeTokens = getThemePreset(DEFAULT_THEME_PRESET_ID).init,
 ): Promise<InkPromptResult<string>> {
   return await new Promise<InkPromptResult<string>>((resolve) => {
     let done = false;
@@ -226,6 +236,7 @@ export async function askInkInputPrompt(
           fieldWidth,
           cursorVisible,
           supportsReverseCursor(),
+          theme,
         )}`;
 
         return [
@@ -240,8 +251,8 @@ export async function askInkInputPrompt(
           {contextLines.map((line, index) => (
             <Text key={`ctx-${index}`}>{line}</Text>
           ))}
-          <Text>{`  ${chalk.bold.green(promptText)}`}</Text>
-          <Text>{`  ${chalk.gray(hintText)}`}</Text>
+          <Text>{`  ${chalk.bold(promptText)}`}</Text>
+          <Text>{`  ${applyChalkColor(theme.mutedColor, hintText)}`}</Text>
           {lines.map((line, index) => (
             <Text key={index}>{line}</Text>
           ))}
@@ -259,6 +270,7 @@ function renderInputField(
   fieldWidth: number,
   cursorVisible: boolean,
   supportsReverse: boolean,
+  theme: InitThemeTokens,
 ): string {
   if (fieldWidth <= 0) {
     return "";
@@ -277,7 +289,8 @@ function renderInputField(
       cursorIndex,
       cursorVisible,
       supportsReverse,
-      chalk.green,
+      (nextValue) => applyChalkColor(theme.contentColor, nextValue),
+      theme.accentStrongColor,
     );
   }
 
@@ -288,7 +301,8 @@ function renderInputField(
     0,
     cursorVisible,
     supportsReverse,
-    chalk.gray,
+    (nextValue) => applyChalkColor(theme.mutedColor, nextValue),
+    theme.accentStrongColor,
   );
 }
 
@@ -298,6 +312,7 @@ function renderCursorOverlay(
   cursorVisible: boolean,
   supportsReverse: boolean,
   paint: (value: string) => string,
+  cursorFallbackColor: InitThemeTokens["accentStrongColor"],
 ): string {
   const safeIndex = Math.max(0, Math.min(cursorIndex, baseField.length - 1));
   const before = baseField.slice(0, safeIndex);
@@ -313,7 +328,7 @@ function renderCursorOverlay(
   }
 
   const fallbackChar = cursorChar === " " ? "█" : cursorChar;
-  return `${paint(before)}${chalk.greenBright(fallbackChar)}${paint(after)}`;
+  return `${paint(before)}${applyChalkColor(cursorFallbackColor, fallbackChar)}${paint(after)}`;
 }
 
 function supportsReverseCursor(): boolean {

@@ -2,7 +2,7 @@
 import React from "react";
 import { Command } from "commander";
 import { render } from "ink";
-import { loadConfig } from "../core/config.js";
+import { loadConfig, setConfigThemePreference } from "../core/config.js";
 import { runInteractiveInit } from "../core/init.js";
 import { ProcessManager } from "../core/process-manager.js";
 import { installSignalHandlers } from "../core/shutdown-handler.js";
@@ -86,6 +86,7 @@ async function main(): Promise<void> {
 async function runDashboard(options: RunOptions): Promise<void> {
   const config = await loadConfig(options.config);
   const maxLogLines = options.maxLogLines ?? config.maxLogLines ?? 200;
+  const configuredTheme = config.ui?.theme;
 
   if (process.stdout.isTTY) {
     console.clear();
@@ -103,6 +104,10 @@ async function runDashboard(options: RunOptions): Promise<void> {
       logBuffer,
       startedAt,
       maxDisplayLines: maxLogLines,
+      initialThemeId: configuredTheme,
+      onThemeChange: async (theme) => {
+        await setConfigThemePreference(options.config, theme);
+      },
       onQuitRequest: () => {
         void shutdown("SIGINT");
       },

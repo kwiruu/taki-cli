@@ -1,6 +1,7 @@
 import React from "react";
 import { readFileSync } from "node:fs";
 import { Box, Text } from "ink";
+import type { InkColor } from "../../theme/index.js";
 
 const CAT_FALLBACK = [
   "  ／l、             ",
@@ -10,13 +11,16 @@ const CAT_FALLBACK = [
 ];
 
 const CAT_LINES = loadCatLines();
-const INIT_MATCH_GREEN = "#00ff8a";
 
-export function CatAnimation(): React.JSX.Element {
+interface CatAnimationProps {
+  color: InkColor;
+}
+
+export function CatAnimation({ color }: CatAnimationProps): React.JSX.Element {
   return (
     <Box flexDirection="column" marginRight={2}>
       {CAT_LINES.map((line, index) => (
-        <Text key={index} color={INIT_MATCH_GREEN}>
+        <Text key={index} color={color}>
           {line.length > 0 ? line : " "}
         </Text>
       ))}
