@@ -1,7 +1,7 @@
 <table>
   <tr>
     <td width="180" valign="top">
-      </br>
+       </br>
       </br>
       <img src="./assets/readme/logo_white.svg" alt="Taki CLI logo" width="140" />
     </td>
